@@ -1,0 +1,35 @@
+{
+  "training_mode": "deep",
+  "dataset": "Naholav/CodeGen-Deep-5K",
+  "use_reasoning": false,
+  "base_model": "Qwen2.5-Coder-1.5B-Instruct",
+  "framework": "unsloth",
+  "lora_config": {
+    "r": 32,
+    "alpha": 64,
+    "dropout": 0.1,
+    "target_modules": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ]
+  },
+  "training_config": {
+    "learning_rate": 0.0002,
+    "epochs": 3,
+    "batch_size": 16,
+    "gradient_accumulation": 1,
+    "effective_batch_size": 16,
+    "max_length": 1024,
+    "weight_decay": 0.01,
+    "warmup_ratio": 0.03,
+    "optimizer": "adamw_8bit",
+    "scheduler": "cosine",
+    "early_stopping_patience": 2,
+    "seed": 42
+  }
+}
