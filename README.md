@@ -1,4 +1,4 @@
-# Competitive Code Reasoning with LoRA Fine-Tuning
+# LoRA Fine-Tuning
 
 This repository contains the implementation of LoRA fine-tuning on the Qwen2.5-Coder-1.5B-Instruct model using two distinct datasets: **CodeGen-Deep-5K** and **CodeGen-Diverse-5K**. The project focuses on enhancing code generation capabilities specifically using the `solution` field (code-only training).
 
