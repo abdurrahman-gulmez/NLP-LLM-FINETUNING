@@ -5,9 +5,9 @@
   "base_model": "Qwen2.5-Coder-1.5B-Instruct",
   "framework": "unsloth",
   "lora_config": {
-    "r": 16,
-    "alpha": 32,
-    "dropout": 0.1,
+    "r": 32,
+    "alpha": 64,
+    "dropout": 0.05,
     "target_modules": [
       "q_proj",
       "k_proj",
@@ -19,14 +19,14 @@
     ]
   },
   "training_config": {
-    "learning_rate": 5e-05,
+    "learning_rate": 0.0002,
     "epochs": 3,
     "batch_size": 16,
     "gradient_accumulation": 1,
     "effective_batch_size": 16,
     "max_length": 1024,
-    "weight_decay": 0.1,
-    "warmup_ratio": 0.1,
+    "weight_decay": 0.01,
+    "warmup_ratio": 0.04,
     "optimizer": "adamw_8bit",
     "scheduler": "cosine",
     "early_stopping_patience": 2,
