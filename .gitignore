@@ -1,0 +1,5 @@
+# PyTorch checkpoints
+*.pt
+*.pth
+checkpoints/
+optimizer.pt
