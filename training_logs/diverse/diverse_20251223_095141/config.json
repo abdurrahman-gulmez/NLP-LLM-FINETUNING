@@ -1,6 +1,6 @@
 {
-  "training_mode": "deep",
-  "dataset": "Naholav/CodeGen-Deep-5K",
+  "training_mode": "diverse",
+  "dataset": "Naholav/CodeGen-Diverse-5K",
   "use_reasoning": false,
   "base_model": "Qwen2.5-Coder-1.5B-Instruct",
   "framework": "unsloth",
@@ -19,17 +19,26 @@
     ]
   },
   "training_config": {
-    "learning_rate": 0.0002,
+    "learning_rate": 0.0001,
     "epochs": 3,
     "batch_size": 16,
     "gradient_accumulation": 1,
     "effective_batch_size": 16,
     "max_length": 1024,
-    "weight_decay": 0.01,
-    "warmup_ratio": 0.04,
+    "weight_decay": 0.005,
+    "warmup_ratio": 0.1,
     "optimizer": "adamw_8bit",
     "scheduler": "cosine",
-    "early_stopping_patience": 2,
-    "seed": 42
+    "max_grad_norm": 1.0,
+    "early_stopping_patience": 3,
+    "seed": 42,
+    "bf16": true
+  },
+  "overfitting_prevention": {
+    "official_split_used": true,
+    "eval_strategy": "steps",
+    "eval_steps": 100,
+    "early_stopping": true,
+    "save_best_only": true
   }
 }
