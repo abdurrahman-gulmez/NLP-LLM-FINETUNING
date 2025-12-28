@@ -1,8 +1,0 @@
-unsloth[colab-new]
-trl
-peft
-accelerate
-bitsandbytes
-datasets
-tensorboard
-matplotlib
