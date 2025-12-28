@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual env
+venv/
+.venv/
+RAG/venv/
+
+# Databases
+*.sqlite
+*.sqlite3
+
+# Model / cache
+*.bin
+*.pt
+*.pth
+
+# OS
+.DS_Store
