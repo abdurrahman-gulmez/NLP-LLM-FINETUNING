@@ -1,0 +1,71 @@
+{
+  "timestamp": "2025-12-23T16:34:37.654204",
+  "config": {
+    "base_model": "Qwen/Qwen2.5-Coder-1.5B-Instruct",
+    "livecodebench_version": "release_v5",
+    "date_range": "2408-2502",
+    "platform": "atcoder",
+    "difficulty": "easy",
+    "model_types": [
+      "deep_instruction"
+    ],
+    "steps": null,
+    "num_problems": 41
+  },
+  "results": [
+    {
+      "model_name": "deep_instruction_checkpoint-step-700-epoch-2",
+      "model_type": "deep_instruction",
+      "checkpoint_path": "models/deep_instruction/checkpoints/checkpoint-step-700-epoch-2",
+      "difficulty": "2408-2502_atcoder",
+      "num_problems": 41,
+      "timestamp": "2025-12-23T16:28:54.260967",
+      "stats": {
+        "total": 41,
+        "passed": 9,
+        "failed": 32,
+        "error": 0,
+        "no_tests": 0,
+        "pass_at_1": 0.21951219512195122
+      },
+      "pass_at_1": 0.21951219512195122,
+      "detailed_log": "results/livecodebench/detailed/deep_instruction_checkpoint-step-700-epoch-2_2408-2502_atcoder.jsonl"
+    },
+    {
+      "model_name": "deep_instruction_checkpoint-step-800-epoch-3",
+      "model_type": "deep_instruction",
+      "checkpoint_path": "models/deep_instruction/checkpoints/checkpoint-step-800-epoch-3",
+      "difficulty": "2408-2502_atcoder",
+      "num_problems": 41,
+      "timestamp": "2025-12-23T16:31:43.081326",
+      "stats": {
+        "total": 41,
+        "passed": 10,
+        "failed": 31,
+        "error": 0,
+        "no_tests": 0,
+        "pass_at_1": 0.24390243902439024
+      },
+      "pass_at_1": 0.24390243902439024,
+      "detailed_log": "results/livecodebench/detailed/deep_instruction_checkpoint-step-800-epoch-3_2408-2502_atcoder.jsonl"
+    },
+    {
+      "model_name": "deep_instruction_checkpoint-step-846-epoch-3",
+      "model_type": "deep_instruction",
+      "checkpoint_path": "models/deep_instruction/checkpoints/checkpoint-step-846-epoch-3",
+      "difficulty": "2408-2502_atcoder",
+      "num_problems": 41,
+      "timestamp": "2025-12-23T16:34:37.653840",
+      "stats": {
+        "total": 41,
+        "passed": 10,
+        "failed": 31,
+        "error": 0,
+        "no_tests": 0,
+        "pass_at_1": 0.24390243902439024
+      },
+      "pass_at_1": 0.24390243902439024,
+      "detailed_log": "results/livecodebench/detailed/deep_instruction_checkpoint-step-846-epoch-3_2408-2502_atcoder.jsonl"
+    }
+  ]
+}
