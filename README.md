@@ -1,95 +1,192 @@
-# LoRA Fine-Tuning
+# Natural Language Processing Project
 
-This repository contains the implementation of LoRA fine-tuning on the Qwen2.5-Coder-1.5B-Instruct model using two distinct datasets: **CodeGen-Deep-5K** and **CodeGen-Diverse-5K**. The project focuses on enhancing code generation capabilities specifically using the `solution` field (code-only training).
+This repository presents a **comprehensive portfolio of advanced Large Language Model (LLM) systems** focused on technical domains such as Python programming, data science, and competitive programming. It integrates **Retrieval-Augmented Generation (RAG)**, **LoRA-based fine-tuning**, and **autonomous ReAct agents** into a cohesive, production-oriented framework.
 
-## 📂 Datasets
-* **DEEP Dataset:** [Naholav/CodeGen-Deep-5K](https://huggingface.co/datasets/Naholav/CodeGen-Deep-5K) - Contains deeper reasoning traces.
-* **DIVERSE Dataset:** [Naholav/CodeGen-Diverse-5K](https://huggingface.co/datasets/Naholav/CodeGen-Diverse-5K) - Contains a wider variety of problem types.
-* **Source:** NVIDIA OpenCode Reasoning dataset.
+---
 
-## ⚙️ Hyperparameters
-The following configuration was used for Deep training runs as the project requirements:
+## Project Overview
 
-| Parameter | Value | Description |
-| :--- | :--- | :--- |
-| **Base Model** | Qwen2.5-Coder-1.5B-Instruct | Unsloth optimized version |
-| **LoRA Rank (r)** | 32 | Matrix rank |
-| **LoRA Alpha** | 64 | r * 2 |
-| **LoRA Dropout** | 0.1 | Regularization |
-| **Target Modules** | q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj | Attention & MLP layers |
-| **Learning Rate** | 2e-4 | Cosine decay scheduler |
-| **Batch Size** | 16 | Effective batch size |
-| **Context Length** | 1024 | Max sequence length |
-| **Epochs** | 3 | Training duration |
-| **Optimizer** | AdamW (8-bit) | With gradient clipping (1.0) |
-| **Weight Decay** | 0.01 |  |
-| **Warmup Ratio** | 0.03 |  |
+The **NLP-LLM-FINETUNING** repository demonstrates how modern LLM techniques can be combined to:
 
-The following configuration was used for Diverse training runs as the project requirements:
+* Reduce hallucinations via document-grounded generation (RAG),
+* Improve code reasoning and generation through efficient instruction fine-tuning (LoRA),
+* Solve complex multi-hop technical tasks using autonomous reasoning-and-action agents (ReAct).
 
-| Parameter | Value | Description |
-| :--- | :--- | :--- |
-| **Base Model** | Qwen2.5-Coder-1.5B-Instruct | Unsloth optimized version |
-| **LoRA Rank (r)** | 32 | Matrix rank |
-| **LoRA Alpha** | 64 | r * 2 |
-| **LoRA Dropout** | 0.05 | Regularization |
-| **Target Modules** | q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj | Attention & MLP layers |
-| **Learning Rate** | 2e-4 | Cosine decay scheduler |
-| **Batch Size** | 16 | Effective batch size |
-| **Context Length** | 1024 | Max sequence length |
-| **Epochs** | 3 | Training duration |
-| **Optimizer** | AdamW (8-bit) | With gradient clipping (1.0) |
-| **Weight Decay** | 0.01 |  |
-| **Warmup Ratio** | 0.04 |  |
+This work is suitable for **research**, **industrial prototyping**, and **real-world technical assistants**.
 
-## 📊 Training Logs & Results
-Training logs including loss values for every 20 steps (train) and 100 steps (eval) are located in the `experiments/` directory.
+---
 
-### Model 1: DEEP Training
-* **Final Train Loss:** 0.0878
-* **Final Eval Loss:** 0.13680578768253326
-* **Hugging Face Model:** [Link Ekle]
+## Core Projects
 
-### Model 2: DIVERSE Training
-* **Final Train Loss:** 0.7709
-* **Final Eval Loss:** 0.9457
-* **Hugging Face Model:** [Link Ekle]
+### Hybrid RAG Academic Assistant
 
-## 🚀 Usage
-To run the inference using the fine-tuned adapters:
+A **production-ready Retrieval-Augmented Generation system** designed to answer technical questions using verified academic and developer documentation (e.g., NumPy, OpenCV, Matplotlib PDFs).
 
-```python
-from unsloth import FastLanguageModel
+#### Objective
 
-model, tokenizer = FastLanguageModel.from_pretrained(
-    "YourUsername/Your-Model-Name", # Replace with HF model ID
-    load_in_4bit = False,
-)
-FastLanguageModel.for_inference(model)
-test_prompt = """Write a Python function that takes a list of integers and returns the sum of all even numbers."""
+To minimize hallucinations by grounding model outputs in authoritative, document-level evidence with explicit citations.
 
-messages = [
-    {"role": "system", "content": SYSTEM_PROMPT},
-    {"role": "user", "content": test_prompt}
-]
+#### Methodology
 
-inputs = tokenizer.apply_chat_template(
-    messages,
-    tokenize=True,
-    add_generation_prompt=True,
-    return_tensors="pt"
-).to("cuda")
+* **Document Processing**:
 
-outputs = model.generate(
-    input_ids=inputs,
-    max_new_tokens=1024,
-    temperature=0.6,
-    do_sample=True,
-    top_p=0.9,
-    pad_token_id=tokenizer.pad_token_id
-)
+  * PDFs loaded via **PyMuPDF**
+  * Chunking strategy: **800 tokens** with **150-token overlap** to preserve semantic context
 
-response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+* **Hybrid Retrieval Strategy**:
 
-print("Output:")
-print(response)
+  * **Semantic Search**: ChromaDB + `all-mpnet-base-v2` embeddings
+  * **Keyword Search**: BM25 Okapi
+
+* **Advanced Re-Ranking**:
+
+  * Cross-Encoder: `ms-marco-MiniLM-L-6-v2`
+  * Top 10 candidates re-ranked → Top 5 passed to the LLM
+
+* **Generation Model**:
+
+  * `Qwen3-4B-Instruct-2507`
+  * Streaming responses with **page-level citations**
+
+This architecture ensures factual accuracy while maintaining fluent, contextual answers.
+
+---
+
+### LoRA Fine-Tuning & Optimization
+
+This module focuses on improving **code generation and reasoning** by fine-tuning the **Qwen2.5-Coder-1.5B-Instruct** model using parameter-efficient LoRA adapters.
+
+#### Datasets
+
+* **DEEP Dataset (5K samples)**
+
+  * Structured, step-by-step reasoning traces
+  * Emphasizes algorithmic and logical consistency
+
+* **DIVERSE Dataset (5K samples)**
+
+  * Broad coverage of programming problem types
+  * Encourages generalization across varied prompts
+
+#### Training Configuration
+
+All models were trained using **Unsloth** with the following hyperparameters:
+
+| Parameter     | DEEP | DIVERSE |
+| ------------- | ---- | ------- |
+| LoRA Rank (r) | 32   | 32      |
+| LoRA Alpha    | 64   | 64      |
+| LoRA Dropout  | 0.1  | 0.05    |
+| Learning Rate | 2e-4 | 2e-4    |
+| Batch Size    | 16   | 16      |
+| Epochs        | 3    | 3       |
+| Warmup Ratio  | 0.03 | 0.04    |
+
+#### Training Results
+
+* **DEEP Model**
+
+  * Train Loss: **0.0878**
+  * Eval Loss: **0.1368**
+
+* **DIVERSE Model**
+
+  * Train Loss: **0.7709**
+  * Eval Loss: **0.9457**
+
+**Analysis**:
+The DEEP model exhibits superior alignment with structured reasoning tasks, while the DIVERSE model reflects the increased complexity of broader task distributions.
+
+---
+
+### Benchmark Evaluation: LiveCodeBench
+
+The fine-tuned models were evaluated using **LiveCodeBench** (AtCoder, Easy problems, releases 2408–2502).
+
+#### Pass@1 Results
+
+| Model         | Pass@1     | Solved      |
+| ------------- | ---------- | ----------- |
+| Base Model    | 21.9%     | 9 / 41      |
+| Deep Finetuned Model    | **24.4%** | **10 / 41** |
+| Diverse-Finetuned Model | **26.8%** | **11 / 41** |
+
+#### Insights
+
+* Both instruction-tuned models outperform the base model
+* **Deep model** excels in multi-step logical reasoning
+* **Diverse model** handles varied problem formulations more flexibly
+
+These results validate the effectiveness of high-quality reasoning-oriented instruction tuning.
+
+---
+
+### ReAct Agent: Autonomous Technical Assistant
+
+The **ReAct (Reason + Act)** agent serves as the orchestration layer, enabling autonomous multi-step problem solving.
+
+#### Architecture
+
+* **Reasoning Loop**: `Thought → Action → Observation`
+* **Primary Model**: `Llama-3.3-70b-versatile`
+
+  * Selected after smaller 8B models failed to maintain long-horizon reasoning
+
+#### Tools
+
+* `search_docs`: Targeted RAG document retrieval
+* `web_search`: DuckDuckGo for real-time information
+* `calculator`: Secure numerical computation
+
+#### Safeguards & Reliability
+
+* **Loop Protection**: `used_actions` tracker prevents repeated tool calls
+* **Forced Reasoning**: Manual injection of `Thought:` after each observation
+* **Multi-Hop Support**: Handles chained queries (retrieve → compute → respond)
+* **Safety Limit**: Hard cap of **8 reasoning steps** to prevent infinite loops
+
+---
+
+## Installation & Setup
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/abdurrahman-gulmez/NLP-LLM-FINETUNING.git
+cd NLP-LLM-FINETUNING
+```
+
+### 2. Install Dependencies
+
+```bash
+pip install -r REACT/requirements.txt
+pip install -r LORA/requirements.txt
+```
+
+### 3. Run Applications
+
+* **ReAct Agent**:
+
+```bash
+streamlit run REACT/react.py
+```
+
+* **RAG Academic Assistant**:
+
+```bash
+streamlit run RAG/rag.py
+```
+
+---
+
+## Conclusion
+
+This repository demonstrates a **robust and scalable integration of modern LLM paradigms**. This project includes:
+
+* **RAG** for factual grounding,
+* **LoRA fine-tuning** for specialized reasoning and coding performance,
+* **ReAct agents** for multi-step problem solving.
+
+---
+
+
