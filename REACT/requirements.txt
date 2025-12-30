@@ -1,0 +1,8 @@
+streamlit
+python-dotenv
+chromadb
+sentence-transformers
+duckduckgo-search
+tiktoken
+groq
+pymupdf

@@ -1,0 +1,12 @@
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Environment variables (GÜVENLİK İÇİN)
+.env
+
+# ChromaDB (Local Database - Her çalıştığında yeniden oluşur)
+chroma_db/
+
+# System files
+.DS_Store
