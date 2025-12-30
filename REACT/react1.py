@@ -11,15 +11,16 @@ from duckduckgo_search import DDGS
 import tiktoken
 from groq import Groq
 import fitz  # PyMuPDF
-import datetime # Zaman damgası için eklendi
+import datetime
 
 # --- 1. AYARLAR ---
 warnings.filterwarnings("ignore")
-st.set_page_config(page_title="ReAct Final Projesi", layout="wide", page_icon="🚀")
+st.set_page_config(page_title="ReAct Final Projesi", layout="wide", page_icon="🧠")
 load_dotenv()
 
-# Hızlı ve İtaatkar Model
-MODEL_ID = "llama-3.1-8b-instant" 
+# KRİTİK DEĞİŞİKLİK: Multi-hop mantığı için 70B modeli şarttır. 
+# 8B modeli ikinci adımda unutkanlık yapar.
+MODEL_ID = "llama-3.3-70b-versatile" 
 
 PDF_PATHS = [
     "docs/beautiful-soup-4-readthedocs-io-en-latest.pdf",
@@ -33,7 +34,7 @@ PDF_PATHS = [
     "docs/xgboost-readthedocs-io-en-latest.pdf"
 ]
 
-# --- 2. RAG MOTORU (Hızlandırılmış) ---
+# --- 2. RAG MOTORU (Temizlenmiş Çıktı) ---
 class KnowledgeBase:
     def __init__(self):
         self.client = chromadb.PersistentClient(path="./chroma_db")
@@ -53,11 +54,9 @@ class KnowledgeBase:
             with fitz.open(path) as doc:
                 for i, page in enumerate(doc):
                     text = page.get_text()
-                    # Çöp sayfaları atla (İçindekiler, çok kısa sayfalar)
                     if len(text.split()) < 50 or "CONTENTS" in text[:50].upper(): continue
                     
                     tokens = text_splitter.encode(text)
-                    # Chunk boyutunu optimize ettim: 500 token
                     for j in range(0, len(tokens), 500):
                         chunk = text_splitter.decode(tokens[j:j+500])
                         all_docs.append(chunk)
@@ -65,7 +64,7 @@ class KnowledgeBase:
                         all_ids.append(f"{os.path.basename(path)}_{i}_{j}")
         
         if all_docs:
-            batch_size = 128 # Daha hızlı yükleme için batch artırıldı
+            batch_size = 128
             for i in range(0, len(all_docs), batch_size):
                 end = min(i + batch_size, len(all_docs))
                 self.collection.add(
@@ -76,7 +75,7 @@ class KnowledgeBase:
                 )
             status.update(label="Sistem Hazır", state="complete", expanded=False)
 
-    def search(self, query: str, top_k: int = 3) -> str:
+    def search(self, query: str, top_k: int = 2) -> str:
         if self.collection.count() == 0: return "Veritabanı boş."
         results = self.collection.query(
             query_embeddings=[self.embedding_model.encode(query).tolist()],
@@ -84,37 +83,44 @@ class KnowledgeBase:
         )
         if not results['documents'][0]: return "Dokümanlarda bilgi bulunamadı."
         
-        # Sadece en alakalı kısımları birleştir
         context = ""
         for i, doc in enumerate(results['documents'][0]):
             meta = results['metadatas'][0][i]
-            context += f"\n[Kaynak: {meta['source']}, Sayfa: {meta['page']}]\n{doc[:1000]}..." # Metni kırp
+            # KRİTİK: Satır sonlarını boşlukla değiştiriyoruz.
+            # Modelin kafası karışmasın diye metni tek satıra indiriyoruz.
+            clean_doc = doc.replace("\n", " ").replace("  ", " ")
+            context += f"\n[Kaynak: {meta['source']}, Sayfa: {meta['page']}] İÇERİK: {clean_doc[:500]}..." 
         return context
 
-# --- 3. ARAÇLAR (Kuvvetlendirilmiş) ---
+# --- 3. ARAÇLAR ---
 class ToolBox:
     def __init__(self, kb: KnowledgeBase):
         self.kb = kb
         self.ddgs = DDGS()
 
     def search_docs(self, query: str) -> str:
-        """Dokümanlarda arama yapar."""
         return self.kb.search(query)
 
     def web_search(self, query: str) -> str:
-        """İnternette arama yapar (Gelişmiş)."""
         try:
-            # max_results 4'e çıkarıldı, daha fazla veri
-            results = self.ddgs.text(query, max_results=4)
+            # Multi-hop için daha fazla sonuç gerekebilir ama özet kısa olmalı
+            results = self.ddgs.text(query, max_results=3, timelimit='y')
             if not results: return "Sonuç bulunamadı."
-            # Ajanın okuması için temiz format
-            return "\n".join([f"Başlık: {r['title']}\nÖzet: {r['body']}" for r in results])
-        except Exception as e: return f"Web Hatası: {e}"
+            
+            formatted_res = []
+            for r in results:
+                # Başlık ve özet temizliği
+                clean_body = r['body'].replace("\n", " ")
+                formatted_res.append(f"Başlık: {r['title']} | Bilgi: {clean_body}")
+            
+            return "\n".join(formatted_res)
+        except Exception as e: return f"Hata: {e}"
 
     def calculator(self, expression: str) -> str:
-        """Matematiksel işlem yapar."""
         try:
-            return str(eval(expression, {"__builtins__": None}, {}))
+            # Güvenli eval
+            clean_expr = expression.replace("x", "*").replace(",", ".")
+            return str(eval(clean_expr, {"__builtins__": None}, {}))
         except: return "Hesaplama Hatası."
 
     def execute(self, name: str, input_str: str) -> str:
@@ -126,12 +132,12 @@ class ToolBox:
 
     def get_descriptions(self) -> str:
         return """
-1. search_docs: Teknik PDF dokümanlarını arar. (Örn: "OpenCV imread parameters")
-2. web_search: İnternette güncel bilgi arar. (Örn: "Requests library timeout default")
-3. calculator: Hesaplama yapar. (Örn: "150 * 10")
+1. search_docs: Teknik PDF dokümanlarını arar.
+2. web_search: İnternet araması. Sadece ANAHTAR KELİME gir (Örn: "python requests timeout").
+3. calculator: Hesaplama yapar (Örn: "10 * 5").
 """
 
-# --- 4. REACT AJAN (Optimize Edilmiş Beyin) ---
+# --- 4. REACT AJAN ---
 class ReActAgent:
     def __init__(self, api_key: str, toolbox: ToolBox):
         self.client = Groq(api_key=api_key)
@@ -142,43 +148,39 @@ class ReActAgent:
         memory = "\n".join([f"{m['role']}: {m['content']}" for m in chat_history[-2:]])
         
         system_prompt = f"""
-        Sen Python Veri Bilimi alanında uzman bir ReAct (Reasoning + Acting) Ajanısın.
-        Görevin: Kullanıcı sorularına elindeki araçları kullanarak adım adım, mantıklı ve doğru cevaplar vermektir.
+Sen Python Veri Bilimi uzmanı bir ReAct Ajanısın.
+Görevin: Soruları adım adım mantık yürüterek çözmek.
 
-        MEVCUT ARAÇLARIN:
-        {self.toolbox.get_descriptions()}
+MEVCUT ARAÇLAR:
+{self.toolbox.get_descriptions()}
 
-        TAKİP ETMEN GEREKEN FORMAT (BU YAPIYI KESİNLİKLE BOZMA):
-        Question: Kullanıcının sorusu
-        Thought: Soruyu çözmek için ne yapmalıyım? Hangi aracı kullanmalıyım? (Her zaman Türkçe düşün)
-        Action: [Araç Adı]: [Girdi]
-        Observation: Aracın çıktısı (Sistem tarafından sağlanır)
-        ... (Gerekirse tekrar Düşün ve Aksiyon al) ...
-        Answer: Nihai cevap (Bulduğun bilgiyi Türkçe yaz)
+STRATEJİ (KESİNLİKLE UY):
+1. **DÜŞÜN (Thought):** Her adımdan önce ne yapacağını planla.
+2. **ÇOK ADIMLI (Multi-Hop):** Eğer soru "X'i bul ve Y yap" diyorsa:
+   - Önce X'i bul (Action: search_docs...)
+   - Sonra gelen veriyi oku.
+   - Sonra Y işlemini yap (Action: calculator...)
+3. **DURMA:** 'Observation' aldıktan sonra hemen yeni bir 'Thought' üret.
+4. **DİL:** Hep Türkçe konuş.
 
-        ÖRNEK OTURUM:
-        Question: Requests kütüphanesinin varsayılan timeout süresi nedir?
-        Thought: Bu teknik bir Python sorusu. Önce 'search_docs' aracını kullanarak Requests dökümantasyonunu taramalıyım.
-        Action: search_docs: requests default timeout
-        Observation: [Kaynak: requests.pdf] ...timeout varsayılan olarak None değerindedir, yani bir zaman aşımı yoktur...
-        Thought: Bilgiyi dökümanda buldum. Varsayılan değer 'None'. Başka bir işlem yapmama gerek yok.
-        Answer: Requests kütüphanesinde varsayılan timeout süresi 'None'dır, yani varsayılan olarak bir zaman aşımı yoktur.
+FORMAT:
+Question: Soru
+Thought: Plan
+Action: [Araç]: [Girdi]
+Observation: [Çıktı]
+Thought: Analiz
+...
+Answer: Cevap
 
-        KRİTİK KURALLAR (KESİNLİKLE UY):
-        1. **STRATEJİ:** Önce `search_docs` ile dokümanları tara. Eğer dokümanlarda net bir cevap bulamazsan İNATLAŞMA, hemen `web_search` aracını kullan.
-        2. **DÖNGÜ KORUMASI:** Eğer Observation kısmında "BU BİLGİYİ ZATEN ALDIN" uyarısını görürsen, ASLA aynı aramayı tekrar yapma. Hemen elindeki bilgiyle veya genel bilginle 'Answer:' yazıp bitir.
-        3. **CEVAPLAMA:** Cevabı bulduğun an (Observation tatmin ediciyse) daha fazla arama yapma, hemen `Answer:` formatında cevabı ver.
-        4. **DİL:** Düşüncelerin ve Cevapların HEP TÜRKÇE olsun.
-
-        Soru: {question}
-        """.strip()
+Soru: {question}
+""".strip()
 
         scratchpad = system_prompt
         trace_log = [] 
         used_actions = set()
 
         step_count = 0
-        while step_count < 7:
+        while step_count < 8:
             step_count += 1
             
             try:
@@ -202,34 +204,36 @@ class ReActAgent:
                 yield {"type": "final", "content": final_answer, "trace": trace_log}
                 return
 
-            # --- 2. AKSİYON AYRIŞTIRMA ---
             actions = [self.action_re.match(a) for a in result.split('\n') if self.action_re.match(a)]
             
             if actions:
                 action, action_input = actions[0].groups()
+                action_input = action_input.strip().strip('"')
                 
-                # --- AKILLI DÖNGÜ KIRICI ---
-                action_key = f"{action}:{action_input.strip()}"
+                action_key = f"{action}:{action_input}"
                 if action_key in used_actions:
-                    # Model aynı şeyi yaparsa, ona kızmıyoruz, cevabı yazmaya zorluyoruz
-                    observation = "HATA: Aynı aramayı tekrar yapıyorsun! Bu yasaktır. Lütfen ya farklı bir araç dene (örn: web_search) ya da bildiklerinle 'Answer:' diyerek cevabı yaz."
+                    observation = "BU BİLGİYİ ZATEN ALDIN. Hemen bir sonraki adıma geç."
                 else:
                     used_actions.add(action_key)
                     yield {"type": "action", "tool": action, "input": action_input}
                     observation = self.toolbox.execute(action, action_input)
                 
-                obs_log = f"\nObservation: {observation}\n"
+                # KRİTİK MÜDAHALE: Modele "Thought:" kelimesini biz veriyoruz.
+                # Bu, modelin Observation'dan sonra durmasını engeller ve düşünmeye zorlar.
+                obs_log = f"\nObservation: {observation}\nThought:" 
                 scratchpad += obs_log
+                
+                # Loglarda güzel görünsün diye düzeltiyoruz
                 trace_log.append(f"Observation: {observation}")
+                trace_log.append("Thought:") 
                 
                 yield {"type": "observation", "content": "Veri alındı."}
             else:
-                # Model saçmalarsa uyar
                 scratchpad += "\nObservation: Lütfen bir Aksiyon al veya 'Answer:' ile bitir.\n"
 
         yield {"type": "final", "content": "Adım limiti doldu.", "trace": trace_log}
 
-# --- 5. ARAYÜZ (Modern ve Temiz) ---
+# --- 5. ARAYÜZ ---
 def main():
     if "agent" not in st.session_state:
         st.session_state.agent = None
@@ -237,7 +241,8 @@ def main():
         st.session_state.messages = []
 
     with st.sidebar:
-        st.header("⚡ Hızlı ReAct Ajanı")
+        st.header("🧠 ReAct Asistanı (Pro)")
+        st.caption("Model: Llama-3.3-70b (Zeki Mod)")
         
         if st.button("Sistemi Başlat / Temizle"):
             api_key = os.getenv("GROQ_API_KEY")
@@ -252,20 +257,13 @@ def main():
             st.session_state.messages = []
             st.success("Aktif!")
 
-        st.markdown("---")
-        st.markdown("**Test Soruları:**")
-        if st.button("Test 1: OpenCV Nedir?"):
-            process_input("OpenCV kütüphanesi ne işe yarar?")
-        if st.button("Test 2: Multi-Hop Hesap"):
-            process_input("Requests kütüphanesinin varsayılan timeout süresini bul ve 20 ile çarp.")
-
-    st.title("🤖 Final Ödev Ajanı (V3)")
+    st.title("🤖 Python Veri Bilimi Asistanı")
 
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-    if prompt := st.chat_input("Bir soru sorun..."):
+    if prompt := st.chat_input("Soru sor..."):
         process_input(prompt)
 
 def process_input(prompt):
@@ -278,6 +276,12 @@ def process_input(prompt):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
+        TOOL_MAPPING = {
+            "search_docs": "📚 Teknik Dökümanlar",
+            "web_search": "🌐 İnternet Araması",
+            "calculator": "🧮 Hesap Makinesi"
+        }
+
         status = st.status("Analiz ediliyor...", expanded=True)
         response_box = st.empty()
         full_trace = []
@@ -285,9 +289,10 @@ def process_input(prompt):
 
         for step in st.session_state.agent.run(prompt, st.session_state.messages):
             if step["type"] == "action":
-                status.write(f"⚙️ **İşlem:** `{step['tool']}` aranıyor...")
+                clean_tool = TOOL_MAPPING.get(step['tool'], step['tool'])
+                status.write(f"🕵️‍♂️ **Analiz:** `{clean_tool}`")
             elif step["type"] == "observation":
-                status.write("✅ Veri Bulundu")
+                status.write("✅ Veri İşlendi")
             elif step["type"] == "final":
                 final_res = step["content"]
                 full_trace = step["trace"]
@@ -299,25 +304,15 @@ def process_input(prompt):
             response_box.markdown(final_res)
             st.session_state.messages.append({"role": "assistant", "content": final_res})
             
-            # --- LOG KAYDETME (.LOG UZANTISIYLA) ---
             try:
-                # 'agent_trace.log' dosyasına ekleme modu ('a') ile yazıyoruz
                 with open("agent_trace.log", "a", encoding="utf-8") as f:
                     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    f.write(f"\n{'='*50}\n")
-                    f.write(f"ZAMAN: {timestamp}\n")
-                    f.write(f"SORU: {prompt}\n")
-                    f.write(f"{'='*50}\n")
+                    f.write(f"\n{'='*50}\nZAMAN: {timestamp}\nSORU: {prompt}\n{'='*50}\n")
                     f.write("\n".join(full_trace))
-                    f.write(f"\n\nCEVAP: {final_res}\n")
-                    f.write(f"{'-'*50}\n")
-                
-                st.toast("Düşünce zinciri 'agent_trace.log' dosyasına kaydedildi.", icon="💾")
-            except Exception as e:
-                st.error(f"Log kaydetme hatası: {e}")
-            # -------------------------------------------
+                    f.write(f"\n\nCEVAP: {final_res}\n{'-'*50}\n")
+            except: pass
 
-            with st.expander("📝 Rapor İçin Trace (Kopyala)"):
+            with st.expander("📝 Düşünce Zinciri (Trace)"):
                 st.code("\n".join(full_trace), language="text")
 
 if __name__ == "__main__":
